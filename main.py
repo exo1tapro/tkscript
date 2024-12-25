@@ -13,7 +13,7 @@ import numpy as np
 tokens_file = "tokens.txt"
 
 def signal_handler(signal, frame):
-    print("\n\nMining stopped. Don't forget to claim your TKS using /claim in discord.gg/kvm.\n")
+    print("\n\nMining stopped. Don't forget to claim your TKS using /claim in (what u looking for, get lost)\n")
     sys.exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -77,7 +77,7 @@ def main():
                     # Submit CPU tasks for the remaining 50%
                     for i in range(50000, 100000):
                         futures.append(executor.submit(generate_hash_cpu, starting_number + i))
-                    
+               
                     for future in concurrent.futures.as_completed(futures):
                         hash_output, starting_number = future.result()
                         f.write(f"{starting_number} | {hash_output}\n")
