@@ -1,64 +1,64 @@
-import numpy as np
+# Under the GPL.
+import hashlib
 import time
-from numba import cuda
+import random
+import sys
+import signal
+from itertools import count
 
-# Constants
-HASHES_PER_BATCH = 1000000  # Number of hashes per batch
-TOKENS_FILE = "tokens.txt"
+tokens_file = "tokens.txt"
 
-# GPU Kernel for SHA-256 (simplified dummy hash function for demonstration)
-@cuda.jit
-def generate_hashes(starting_numbers, results):
-    idx = cuda.grid(1)
-    if idx < starting_numbers.size:
-        seed = starting_numbers[idx]
-        # Simulate hashing by creating a dummy hash result
-        hash_value = 0
-        for i in range(10):
-            hash_value += (seed * 31) % 1000000007
-        results[idx] = hash_value
+def signal_handler(signal, frame):
+    print("\n\nMining stopped. Don't forget to claim your TKS using /claim in discord.gg/kvm.\n")
+    sys.exit(0)
 
-def gpu_hashing(start_numbers):
-    # Allocate memory for results
-    results = np.zeros_like(start_numbers, dtype=np.int64)
+signal.signal(signal.SIGINT, signal_handler)
 
-    # Define GPU grid and block dimensions
-    threads_per_block = 256
-    blocks_per_grid = (start_numbers.size + (threads_per_block - 1)) // threads_per_block
+def generate_hash(starting_number):
+    while True:
+        rand_seed = random.random()
+        hash_input = f"{time.time()}_{rand_seed}_{starting_number}".encode('utf-8')
+        hash_output = hashlib.sha256(hash_input).hexdigest()
+        yield hash_output, starting_number
+        starting_number += random.randint(1, 5)
 
-    # Launch the GPU kernel
-    generate_hashes[blocks_per_grid, threads_per_block](start_numbers, results)
-
-    # Wait for GPU to finish
-    cuda.synchronize()
-    return results
+def start_screen():
+    print("")
+    print("  _  ____     ____  __       _ _____   _____     _")
+    print(" | |/ /\ \   / /  \/  |     (_)___  | |_   _|__ | | _____ _ __  ___ ")
+    print(" | ' /  \ \ / /| |\/| |_____| |  / /    | |/ _ \| |/ / _ \ '_ \/ __| ")
+    print(" | . \   \ V / | |  | |_____| | / /     | | (_) |   <  __/ | | \__ \ ")
+    print(" |_|\_\   \_/  |_|  |_|     |_|/_/      |_|\___/|_|\_\___|_| |_|___/ ")
+    print(" Free-Miner | Upgraded by evlolptero (The Best so far!)")
+    print("")
+    print(" [Y/N] Start Mining\n")
+    user_input = input(" > ").strip().lower()
+    if user_input == "y":
+        return True
+    else:
+        print("Exiting program. To mine tokens later, run the script again.")
+        sys.exit(0)
 
 def main():
-    total_mined = 0
-    start_time = time.time()
+    if start_screen():
+        print("\nMining started...\n")
+        with open(tokens_file, 'a') as f:
+            starting_number = random.randint(500000, 1000000)
+            hash_generator = generate_hash(starting_number)
+            total_mined = 0
+            start_time = time.time()
+            try:
+                for _ in count():  # Infinite loop
+                    hash_output, starting_number = next(hash_generator)
+                    f.write(f"{starting_number} | {hash_output}\n")
+                    total_mined += 1
 
-    with open(TOKENS_FILE, "a") as f:
-        while True:
-            # Generate random starting numbers
-            start_numbers = np.random.randint(1, 1000000, size=HASHES_PER_BATCH, dtype=np.int64)
-
-            # Generate hashes using the GPU
-            hashes = gpu_hashing(start_numbers)
-
-            # Write results to the file
-            for number, hash_value in zip(start_numbers, hashes):
-                f.write(f"{number} | {hash_value}\n")
-
-            # Update statistics
-            total_mined += HASHES_PER_BATCH
-            elapsed_time = time.time() - start_time
-            hashrate = total_mined / elapsed_time
-
-            # Print live statistics
-            print(f"\rMined: {total_mined:,} TKS  |  Hashrate: {hashrate:,.2f} Hashes/s", end="")
+                    if total_mined % 100000 == 0:  # Update every 100k hashes
+                        elapsed_time = time.time() - start_time
+                        hashrate = total_mined / elapsed_time
+                        print(f"\rMined: {total_mined:,} TKS  |  Hashrate: {hashrate:,.2f} Hashes/s", end="")
+            except KeyboardInterrupt:
+                pass
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\nMining stopped.")
+    main()
